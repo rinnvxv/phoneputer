@@ -130,7 +130,7 @@ ssh root@-localip-
 Rebuilding with the full flake requires internet access on the phone.
 Since it's only connected via USB, we share the PC's connection over the USB link (NAT).
 
-On PC
+On PC (Change wlp0s20fs and enp0s20f0u3 to your port)
 #+begin_src sh
 ip a
 sudo sysctl -w net.ipv4.ip_forward=1
