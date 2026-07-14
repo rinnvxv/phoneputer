@@ -1,5 +1,5 @@
 {
-  description = "NixOS Mobile for OnePlus 6 (enchilada)";
+  description = "NixOS Mobile for OnePlus 6T (fajita)";
 
   ############################################
   # Input Dependencies
@@ -26,10 +26,10 @@
         phoneputer = nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
-            (import "${mobile-nixos}/lib/configuration.nix" { device = "oneplus-enchilada"; })
+            (import "${mobile-nixos}/lib/configuration.nix" { device = "oneplus-fajita"; })
             ./configuration.nix
           ];
         };
       };
     };
-} 
+}
