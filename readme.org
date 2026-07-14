@@ -125,6 +125,32 @@ NixOS Mobile provides SSH access because we set it up in the local.nix base conf
 ssh root@-localip-
 #+end_src
 
+** Connect network via Computer
+
+Rebuilding with the full flake requires internet access on thephone.
+Since it's only connected via USB, we share the PC's connection over the USB link (NAT).
+
+On PC
+#+begin_src sh
+ip a
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo iptables -t nat -A POSTROUTING -o wlp0s20f3 -j MASQUERADE
+sudo iptables -A FORWARD -i enp0s20f0u3 -o wlp0s20f3 -j ACCEPT
+sudo iptables -A FORWARD -i wlp0s20f3 -o enp0s20f0u3 -m state --state RELATED,ESTABLISHED -j ACCEPT
+#+end_src
+
+On Phone
+#+begin_src sh
+ip route add default via 172.16.42.2
+ping -c 3 8.8.8.8
+#+end_src
+
+If resolv.conf isn't blank
+#+begin_src sh
+cat /etc/resolv.conf
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+#+end_src
+
 ** Clone Your Configuration Repository
 
 Once connected to the device we will rebuild without using the local.nix but like we're used to on a normal NixOS flake install. Adjust the configuration.nix to your liking, but I would suggest building the included one first. It will boot you into GNOME:
@@ -136,7 +162,17 @@ cd phoneputer
 
 ** Rebuild with Your Flake Configuration
 
+If the phone's USB interface uses a larger MTU than the shared path can handle, large downloads/builds will hang partway through.
+Lowering MTU on both ends fixes this:
+
+On PC
 #+begin_src sh
+sudo ip link set enp0s20f0u3 mtu 1400
+#+end_src
+
+On Phone
+#+begin_src sh
+ip link set usb0 mtu 1400
 nixos-rebuild switch --flake .#phoneputer
 #+end_src
 
