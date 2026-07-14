@@ -127,7 +127,7 @@ ssh root@-localip-
 
 ** Connect network via Computer
 
-Rebuilding with the full flake requires internet access on thephone.
+Rebuilding with the full flake requires internet access on the phone.
 Since it's only connected via USB, we share the PC's connection over the USB link (NAT).
 
 On PC
