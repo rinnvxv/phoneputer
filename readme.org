@@ -39,22 +39,6 @@ cp ../local.nix .
 nix-build --argstr device oneplus-fajita -A outputs.android-fastboot-images --impure
 #+end_src
 
-Keep =local.nix= minimal. This first build only needs to get you to
-a booted system with SSH access — the file included in this repo
-(unfree firmware + SSH) is intentionally bare-bones. Adding extra
-kernel modules, combining =networking.networkmanager= with
-=networking.wireless=, or importing
-=mobile-nixos/lib/configuration.nix= directly into =local.nix= have
-all been observed to prevent the device from completing
-=switch_root= on fajita — the boot log gets stuck right after the
-rootfs mounts, with no error visible unless you also enable
-=mobile.boot.stage-1.shell.shellOnFail= and
-=mobile.boot.stage-1.gui.enable = false;= to see the raw console
-output. If your build boots to a splash screen and never shows a
-login prompt or SSH access, this is the most likely cause — trim
-=local.nix= back down and try again, then add features back one at
-a time, confirming a successful boot after each change.
-
 * Prepare the Phone
 
 ** Update OxygenOS
@@ -222,23 +206,6 @@ On Phone
 ip link set usb0 mtu 1400
 nixos-rebuild switch --flake .#phoneputer
 #+end_src
-
-If a build appears to hang for a long time with no progress, don't
-assume it's stuck — GNOME's dependency closure is large and can take
-a long time to download and compile on this hardware, especially
-tethered through a PC. Before interrupting, check whether it's
-actually still working from a second SSH session:
-
-#+begin_src sh
-ps aux | grep "nix.*build"
-du -sh /nix/store
-#+end_src
-
-If the reported CPU time and store size keep increasing over a
-minute or two, it's still working — just let it run. If both are
-completely static, the network path has likely stalled (see the MTU
-note above) and it's safe to =Ctrl-C= and retry; already-downloaded
-paths are cached and won't be re-fetched.
 
 ** Set Up a Normal User (recommended)
 
