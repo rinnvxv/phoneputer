@@ -12,6 +12,24 @@
   services.openssh.settings.PermitRootLogin = "yes"; # For initial setup
   services.openssh.settings.PasswordAuthentication = true; # For initial setup
 
+  networking.networkmanager.unmanaged = [ "usb0" ];
+
+  networking.interfaces.usb0.ipv4.addresses = [
+    { address = "172.16.42.1"; prefixLength = 24; }
+  ];
+
+  services.dnsmasq = {
+    enable = true;
+    settings = {
+      interface = [ "usb0" ];
+      bind-interfaces = true;
+      except-interface = [ "lo" ];
+      dhcp-range = [ "172.16.42.10,172.16.42.50,12h" ];
+    };
+  };
+
+  networking.firewall.trustedInterfaces = [ "usb0" ];
+
   # Enable audio
   # PipeWire is enabled by default, but the audio is very quiet with it
   services.pipewire.enable = lib.mkForce false;
@@ -19,7 +37,14 @@
   services.pulseaudio.enable = true;
 
   # Set root password for SSH access
-  users.users.root.password = "nixtheplanet";
+  users.users.root.password = "nixtheplanet"; # Change to your root password
+
+  # Add normal user
+  users.users.user = { # Change user to your username
+    isNormalUser = true;
+    initialPassword = "nixtheplanet"; # Change to your user password
+    extraGroups = [ "wheel" ];
+  };
 
   # Enable GNOME Desktop Environment
   services.xserver.enable = true;
@@ -28,6 +53,8 @@
 
   # Enable GNOME Keyring for password management
   services.gnome.gnome-keyring.enable = true;
+
+  programs.firefox.enable = true;
 
   # Enable dconf for GNOME settings
   programs.dconf.enable = true;
@@ -59,7 +86,9 @@
     lazygit
     asciiquarium
     neovim
-    kitty
+    alacritty
+    neofetch
+    fastfetch
   ];
 
   system.stateVersion = "26.05";
