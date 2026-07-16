@@ -86,7 +86,6 @@
     lazygit
     asciiquarium
     neovim
-    alacritty
     neofetch
     fastfetch
   ];
