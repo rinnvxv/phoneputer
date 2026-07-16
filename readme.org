@@ -1,5 +1,5 @@
 #+TITLE: NixOS Mobile Tutorial for OnePlus 6T (fajita)
-#+AUTHOR: %?
+#+AUTHOR: rinnvxv
 #+DATE: 2026
 #+OPTIONS: toc:t num:t
 #+PROPERTY: header-args:sh :session *nixos-mobile*
@@ -9,6 +9,15 @@
 This tutorial guides you through installing NixOS Mobile on a OnePlus 6T (fajita) device. The process involves building a minimal base image using the local.nix file (with fixes to make it build on x86 machines), flashing it to your device, then rebuilding on the phone itself (aarch64) with the full configuration.nix and flake method we're all used to in the NixOS ecosystem.
 
 video tutorial; https://youtu.be/yxfDNqZ9WTM
+
+⚠️ **Security**: The configuration in this repo enables SSH with
+password authentication and root login, and ships with a default
+password (=nixtheplanet=), purely to make the first boot possible.
+**Change =users.users.root.password= and
+=users.users.user.initialPassword= in configuration.nix before
+connecting the phone to any network you don't fully trust**, or
+switch to SSH key authentication and disable password auth once
+you're set up.
 
 * Clone Your Configuration Repository
 
@@ -29,6 +38,22 @@ cd mobile-nixos
 cp ../local.nix .
 nix-build --argstr device oneplus-fajita -A outputs.android-fastboot-images --impure
 #+end_src
+
+Keep =local.nix= minimal. This first build only needs to get you to
+a booted system with SSH access — the file included in this repo
+(unfree firmware + SSH) is intentionally bare-bones. Adding extra
+kernel modules, combining =networking.networkmanager= with
+=networking.wireless=, or importing
+=mobile-nixos/lib/configuration.nix= directly into =local.nix= have
+all been observed to prevent the device from completing
+=switch_root= on fajita — the boot log gets stuck right after the
+rootfs mounts, with no error visible unless you also enable
+=mobile.boot.stage-1.shell.shellOnFail= and
+=mobile.boot.stage-1.gui.enable = false;= to see the raw console
+output. If your build boots to a splash screen and never shows a
+login prompt or SSH access, this is the most likely cause — trim
+=local.nix= back down and try again, then add features back one at
+a time, confirming a successful boot after each change.
 
 * Prepare the Phone
 
@@ -107,11 +132,19 @@ Flash the critical partitions:
 ./result/flash-critical.sh
 #+end_src
 
-Flash system image:
+Erase and reformat userdata, then flash the system image. This step
+is what actually gets overwritten every time you rebuild the base
+image, so re-run it whenever you change =local.nix= and rebuild:
 
 #+begin_src sh
+fastboot erase userdata
+fastboot format:ext4 userdata
 fastboot flash userdata system.img
 #+end_src
+
+If =system.img= is larger than the =system= partition can hold on
+this device, flash it to =userdata= instead as shown above (fajita
+uses userdata as the main rootfs partition with this build).
 
 ⚠️ **Note**: If the phone isn't recognized, try connecting it *after* booting into fastboot mode.
 
@@ -122,8 +155,13 @@ fastboot flash userdata system.img
 NixOS Mobile provides SSH access because we set it up in the local.nix base configuration we've built. Connect to the device:
 
 #+begin_src sh
-ssh root@-localip-
+ssh root@172.16.42.1
 #+end_src
+
+If you don't know the phone's address, check the USB interface that
+appeared on your computer when you plugged the phone in (=ip a= on
+Linux) — the phone is almost always reachable at =172.16.42.1= over
+that link with this device's default gadget networking.
 
 ** Connect network via Computer
 
@@ -151,9 +189,18 @@ cat /etc/resolv.conf
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #+end_src
 
+Note: these NAT rules and the manual =ip route=/=resolv.conf= fixes
+are only needed for this *first* rebuild, while you're still running
+the minimal =local.nix= image. The =configuration.nix= in this repo
+already includes =networking.networkmanager.insertNameservers= and a
+dnsmasq server on the phone's USB interface, so once you've
+successfully switched to it, your computer will get an IP
+automatically over USB and DNS will keep working across reboots —
+you shouldn't need to repeat this section afterwards.
+
 ** Clone Your Configuration Repository
 
-Once connected to the device we will rebuild without using the local.nix but like we're used to on a normal NixOS flake install. Adjust the configuration.nix to your liking, but I would suggest building the included one first. It will boot you into GNOME:
+Once connected to the device we will rebuild without using the local.nix but like we're used to on a normal NixOS flake install. Adjust the configuration.nix to your liking, but I would suggest building the included one first. It will attempt to boot you into GNOME (see "Known Issues" below if the desktop doesn't come up):
 
 #+begin_src sh
 git clone https://github.com/rinnvxv/phoneputer.git
@@ -176,10 +223,97 @@ ip link set usb0 mtu 1400
 nixos-rebuild switch --flake .#phoneputer
 #+end_src
 
+If a build appears to hang for a long time with no progress, don't
+assume it's stuck — GNOME's dependency closure is large and can take
+a long time to download and compile on this hardware, especially
+tethered through a PC. Before interrupting, check whether it's
+actually still working from a second SSH session:
+
+#+begin_src sh
+ps aux | grep "nix.*build"
+du -sh /nix/store
+#+end_src
+
+If the reported CPU time and store size keep increasing over a
+minute or two, it's still working — just let it run. If both are
+completely static, the network path has likely stalled (see the MTU
+note above) and it's safe to =Ctrl-C= and retry; already-downloaded
+paths are cached and won't be re-fetched.
+
+** Set Up a Normal User (recommended)
+
+Working as =root= over SSH is fine to get started, but for day to
+day use it's worth switching to the =user= account defined in
+configuration.nix:
+
+#+begin_src sh
+ssh user@172.16.42.1
+sudo nixos-rebuild switch --flake .#phoneputer
+#+end_src
+
+If you'd rather not type your password for every =sudo= command,
+add this to configuration.nix (understand that this weakens local
+security in exchange for convenience):
+
+#+begin_src nix
+security.sudo.wheelNeedsPassword = false;
+#+end_src
+
+If you previously cloned this repo as =root= (e.g. into
+=/root/phoneputer=), move it into your normal user's home directory
+so you can edit and rebuild without needing root for everything:
+
+#+begin_src sh
+sudo mv /root/phoneputer /home/user/phoneputer
+sudo chown -R user:users /home/user/phoneputer
+#+end_src
+
+* Known Issues (fajita)
+
+- **GDM sometimes fails to start.** In testing, =gdm.service= was
+  found masked by the mobile-nixos device profile on this device;
+  force-enabling it with
+  =systemd.services.gdm.enable = lib.mkOverride 10 true;= got it to
+  attempt to start, but it then crashed immediately with
+  =signal=TRAP= (core-dump), repeatedly. Phosh
+  (=services.xserver.desktopManager.phosh=) was also tried as an
+  alternative display shell and crashed unpredictably as well
+  (silent =exit-code 1=, restarting every ~10s). A reliably working
+  graphical shell for fajita on this kernel is still an open
+  problem — contributions welcome. SSH access works regardless of
+  whether the desktop comes up.
+- **Lock screen keyboard can double-register taps.** After
+  rotating the screen or on some boots, typing a password character
+  can immediately get "erased" by a duplicate touch event, making it
+  impossible to unlock via the touchscreen. If this happens, SSH in
+  and run:
+  #+begin_src sh
+  loginctl list-sessions
+  loginctl unlock-session <id>
+  #+end_src
+  or simply reboot — this has been observed to resolve itself after
+  a fresh boot.
+- **Suspend can interrupt long-running rebuilds.** GNOME's default
+  power settings will suspend the phone (and kill anything running
+  over SSH) if the screen is left off. If you're doing a long
+  =nixos-rebuild switch=, either keep the screen awake or mask sleep
+  targets first:
+  #+begin_src sh
+  sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+  #+end_src
+- **=nix run= / =nix search= complain about experimental features.**
+  This is already fixed in this repo's configuration.nix via
+  =nix.settings.experimental-features=, but if you're still on the
+  bare =local.nix= image (before your first =nixos-rebuild switch=),
+  you'll need to pass the flag manually:
+  #+begin_src sh
+  nix --extra-experimental-features 'nix-command flakes' run <flake>
+  #+end_src
+
 * What's Next?
 
-After the rebuild completes, your OnePlus 6 will have:
-- GNOME desktop environment (with bloat removed)
+After the rebuild completes, your OnePlus 6T will have:
+- GNOME desktop environment (with bloat removed) — see Known Issues if it doesn't render
 - SSH access for remote development
 - Your custom package selection
 - Full NixOS declarative configuration
@@ -190,9 +324,23 @@ You can now:
 - Rebuild anytime with `nixos-rebuild switch --flake .#phoneputer`
 - Use the device as a full Linux development environment
 
+Housekeeping tip: rebuilds and =nix run= invocations accumulate old
+store paths over time. Once you're happy with a working
+configuration, reclaim disk space with:
+#+begin_src sh
+sudo nix-collect-garbage -d
+#+end_src
+This is safe for your currently booted system generation, but note
+that =-d= removes older generations too, so you lose the ability to
+roll back to them.
+
 * 4G / LTE Support
 
 Once you have the base install working, check out the [[https://github.com/mwlaboratories/phoneputer/tree/4g-testing][4g-testing branch]] for a follow-up tutorial that gets cellular connectivity working. It uses a [[https://github.com/mwlaboratories/mobile-nixos/tree/sdm845-bleeding-edge][fork of mobile-nixos]] with an upgraded kernel (6.19) and critical module fixes. 4G, frontal camera, and more are all functional.
+
+Note: this branch targets OnePlus 6 (enchilada); adapting it to
+fajita follows the same pattern as this tutorial (swap the device
+string, expect to re-verify boot stability on your own).
 
 * Resources
 
