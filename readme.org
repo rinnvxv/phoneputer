@@ -268,48 +268,6 @@ sudo mv /root/phoneputer /home/user/phoneputer
 sudo chown -R user:users /home/user/phoneputer
 #+end_src
 
-* Known Issues (fajita)
-
-- **GDM sometimes fails to start.** In testing, =gdm.service= was
-  found masked by the mobile-nixos device profile on this device;
-  force-enabling it with
-  =systemd.services.gdm.enable = lib.mkOverride 10 true;= got it to
-  attempt to start, but it then crashed immediately with
-  =signal=TRAP= (core-dump), repeatedly. Phosh
-  (=services.xserver.desktopManager.phosh=) was also tried as an
-  alternative display shell and crashed unpredictably as well
-  (silent =exit-code 1=, restarting every ~10s). A reliably working
-  graphical shell for fajita on this kernel is still an open
-  problem — contributions welcome. SSH access works regardless of
-  whether the desktop comes up.
-- **Lock screen keyboard can double-register taps.** After
-  rotating the screen or on some boots, typing a password character
-  can immediately get "erased" by a duplicate touch event, making it
-  impossible to unlock via the touchscreen. If this happens, SSH in
-  and run:
-  #+begin_src sh
-  loginctl list-sessions
-  loginctl unlock-session <id>
-  #+end_src
-  or simply reboot — this has been observed to resolve itself after
-  a fresh boot.
-- **Suspend can interrupt long-running rebuilds.** GNOME's default
-  power settings will suspend the phone (and kill anything running
-  over SSH) if the screen is left off. If you're doing a long
-  =nixos-rebuild switch=, either keep the screen awake or mask sleep
-  targets first:
-  #+begin_src sh
-  sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
-  #+end_src
-- **=nix run= / =nix search= complain about experimental features.**
-  This is already fixed in this repo's configuration.nix via
-  =nix.settings.experimental-features=, but if you're still on the
-  bare =local.nix= image (before your first =nixos-rebuild switch=),
-  you'll need to pass the flag manually:
-  #+begin_src sh
-  nix --extra-experimental-features 'nix-command flakes' run <flake>
-  #+end_src
-
 * What's Next?
 
 After the rebuild completes, your OnePlus 6T will have:
@@ -323,16 +281,6 @@ You can now:
 - Add more packages or services
 - Rebuild anytime with `nixos-rebuild switch --flake .#phoneputer`
 - Use the device as a full Linux development environment
-
-Housekeeping tip: rebuilds and =nix run= invocations accumulate old
-store paths over time. Once you're happy with a working
-configuration, reclaim disk space with:
-#+begin_src sh
-sudo nix-collect-garbage -d
-#+end_src
-This is safe for your currently booted system generation, but note
-that =-d= removes older generations too, so you lose the ability to
-roll back to them.
 
 * 4G / LTE Support
 
