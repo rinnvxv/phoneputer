@@ -6,11 +6,14 @@
 {
   # Allow unfree packages (needed for OnePlus firmware)
   nixpkgs.config.allowUnfree = true;
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   # Enable SSH server (essential for mobile device access)
   services.openssh.enable = true;
   services.openssh.settings.PermitRootLogin = "yes"; # For initial setup
   services.openssh.settings.PasswordAuthentication = true; # For initial setup
+
+  networking.networkmanager.insertNameservers = [ "8.8.8.8" "1.1.1.1" ];
 
   networking.networkmanager.unmanaged = [ "usb0" ];
 
