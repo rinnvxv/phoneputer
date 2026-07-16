@@ -105,8 +105,15 @@
     lazygit     # terminal UI for git
     asciiquarium # just for fun
     neovim      # text editor
-    neofetch    # system info display
     fastfetch   # faster system info display
+  ];
+
+  # noto-fonts for Chinese, Japanese, Korean
+  fonts.packages = with pkgs; [
+    noto-fonts
+    noto-fonts-cjk-sans
+    noto-fonts-cjk-serif
+    noto-fonts-color-emoji
   ];
 
   # This value should match the NixOS release you initially installed with.
