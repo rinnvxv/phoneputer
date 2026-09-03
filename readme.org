@@ -147,12 +147,46 @@ appeared on your computer when you plugged the phone in (=ip a= on
 Linux) — the phone is almost always reachable at =172.16.42.1= over
 that link with this device's default gadget networking.
 
-** Connect network via Computer
+** Connect Network via Computer
 
 Rebuilding with the full flake requires internet access on the phone.
-Since it's only connected via USB, we share the PC's connection over the USB link (NAT).
+Since it's only connected via USB, we share the PC's connection over the USB link using NAT.
 
-On PC (Change wlp0s20fs and enp0s20f0u3 to your port)
+There are two ways to set this up on the PC.
+
+*** Option 1: Use the Automatic Tethering Script
+
+The repository includes =nix_phone_tether.sh=, which automatically
+detects the Wi-Fi and USB interfaces and configures IP forwarding
+and the required iptables NAT rules.
+
+On the PC:
+
+#+begin_src sh
+chmod +x nix_phone_tether.sh
+sudo ./nix_phone_tether.sh
+#+end_src
+
+If the interfaces cannot be detected automatically, specify them
+manually:
+
+#+begin_src sh
+sudo ./nix_phone_tether.sh <wifi_iface> <usb_iface>
+#+end_src
+
+For example:
+
+#+begin_src sh
+sudo ./nix_phone_tether.sh wlp0s20f3 enp0s20f0u3
+#+end_src
+
+*** Option 2: Configure the NAT Rules Manually
+
+Run =ip a= first to identify your Wi-Fi and USB interfaces. Replace
+=wlp0s20f3= and =enp0s20f0u3= below with the interfaces on your system.
+
+On PC:
+
 #+begin_src sh
 ip a
 sudo sysctl -w net.ipv4.ip_forward=1
@@ -161,13 +195,15 @@ sudo iptables -A FORWARD -i enp0s20f0u3 -o wlp0s20f3 -j ACCEPT
 sudo iptables -A FORWARD -i wlp0s20f3 -o enp0s20f0u3 -m state --state RELATED,ESTABLISHED -j ACCEPT
 #+end_src
 
-On Phone
+On Phone:
+
 #+begin_src sh
 ip route add default via 172.16.42.2
 ping -c 3 8.8.8.8
 #+end_src
 
-If resolv.conf isn't blank
+If =resolv.conf= isn't blank:
+
 #+begin_src sh
 cat /etc/resolv.conf
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
@@ -191,21 +227,54 @@ git clone https://github.com/rinnvxv/phoneputer.git
 cd phoneputer
 #+end_src
 
-** Rebuild with Your Flake Configuration
+** Initial Rebuild with Your Flake Configuration
 
-If the phone's USB interface uses a larger MTU than the shared path can handle, large downloads/builds will hang partway through.
-Lowering MTU on both ends fixes this:
+At this point, the phone is still running the minimal system built
+from =local.nix=. From inside the cloned repository on the phone,
+perform the first rebuild using the flake configuration:
 
-On PC
 #+begin_src sh
-sudo ip link set enp0s20f0u3 mtu 1400
+sudo nixos-rebuild switch --flake .#phoneputer
 #+end_src
 
-On Phone
+Once the rebuild completes successfully, reboot the phone:
+
 #+begin_src sh
-ip link set usb0 mtu 1400
-nixos-rebuild switch --flake .#phoneputer
+sudo reboot
 #+end_src
+
+After the reboot, the phone will be running the configuration from
+the repository instead of the minimal =local.nix= setup.
+
+** Replace configuration.nix with replaceConfig.nix
+
+After the first successful reboot, replace =configuration.nix= with
+=replaceConfig.nix=. This allows you to switch from the initial configuration to
+the =replaceConfig.nix= configuration before performing the final rebuild.
+
+From the phone:
+
+#+begin_src sh
+cd ~/phoneputer
+mv configuration.nix configuration.bak
+cp replaceConfig.nix configuration.nix
+#+end_src
+
+You can edit =configuration.nix= further if needed. Once it contains
+the desired configuration, rebuild the system again:
+
+#+begin_src sh
+sudo nixos-rebuild switch --flake .#phoneputer
+#+end_src
+
+After the rebuild completes successfully, reboot the phone again:
+
+#+begin_src sh
+sudo reboot
+#+end_src
+
+At this point, the phone should be running the system configured by
+=replaceConfig.nix= through =configuration.nix=.
 
 ** Set Up a Normal User (recommended)
 
