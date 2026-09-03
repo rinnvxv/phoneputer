@@ -55,14 +55,14 @@
   services.pulseaudio.enable = true;
 
   # Set root password for SSH access
-  users.users.root.password = "nixtheplanet"; # Change to your root password
+  users.users.root.password = "0000"; # Change to your root password
 
   # Add normal user
-  users.users.user = { # Change user to your username
-    isNormalUser = true;
-    initialPassword = "nixtheplanet"; # Change to your user password
-    extraGroups = [ "wheel" ]; # Needed for sudo access
-  };
+  # users.users.user = { # Change user to your username
+  #  isNormalUser = true;
+  #  initialPassword = "0000"; # Change to your user password
+  #  extraGroups = [ "wheel" ]; # Needed for sudo access
+  # };
 
   # Enable GNOME Desktop Environment
   services.xserver.enable = true;
@@ -106,6 +106,7 @@
     asciiquarium # just for fun
     neovim      # text editor
     fastfetch   # faster system info display
+    kitty.terminfo
   ];
 
   # noto-fonts for Chinese, Japanese, Korean
@@ -118,5 +119,5 @@
 
   # This value should match the NixOS release you initially installed with.
   # See: https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion
-  system.stateVersion = "26.05";
+  system.stateVersion = "26.11";
 }
