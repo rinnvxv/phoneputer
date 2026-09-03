@@ -11,13 +11,16 @@ This tutorial guides you through installing NixOS Mobile on a OnePlus 6T (fajita
 video tutorial; https://youtu.be/yxfDNqZ9WTM
 
 ⚠️ **Security**: The configuration in this repo enables SSH with
-password authentication and root login, and ships with a default
-password (=nixtheplanet=), purely to make the first boot possible.
-**Change =users.users.root.password= and
-=users.users.user.initialPassword= in configuration.nix before
-connecting the phone to any network you don't fully trust**, or
-switch to SSH key authentication and disable password auth once
-you're set up.
+password authentication and root login, and ships with the default
+root password =0000=, purely to make the first boot possible.
+**Change the root password in configuration.nix before connecting the
+phone to any network you don't fully trust**, or switch to SSH key
+authentication and disable password authentication once you're set up.
+
+The normal user account is included in =configuration.nix= but is
+commented out by default. If you want to use a normal user instead
+of working directly as =root=, uncomment the relevant user
+configuration and rebuild the system.
 
 * Clone Your Configuration Repository
 
@@ -142,6 +145,15 @@ NixOS Mobile provides SSH access because we set it up in the local.nix base conf
 ssh root@172.16.42.1
 #+end_src
 
+The default root password is:
+
+#+begin_src text
+0000
+#+end_src
+
+⚠️ **Security**: Change this password as soon as possible, especially
+before connecting the phone to an untrusted network.
+
 If you don't know the phone's address, check the USB interface that
 appeared on your computer when you plugged the phone in (=ip a= on
 Linux) — the phone is almost always reachable at =172.16.42.1= over
@@ -249,14 +261,15 @@ the repository instead of the minimal =local.nix= setup.
 ** Replace configuration.nix with replaceConfig.nix
 
 After the first successful reboot, replace =configuration.nix= with
-=replaceConfig.nix=. This allows you to switch from the initial configuration to
-the =replaceConfig.nix= configuration before performing the final rebuild.
+=replaceConfig.nix=. This allows you to switch from the initial
+configuration to the =replaceConfig.nix= configuration before
+performing the final rebuild.
 
 From the phone:
 
 #+begin_src sh
 cd ~/phoneputer
-mv configuration.nix configuration.bak
+mv configuration.nix configuration.nix.backup
 cp replaceConfig.nix configuration.nix
 #+end_src
 
@@ -279,12 +292,27 @@ At this point, the phone should be running the system configured by
 ** Set Up a Normal User (recommended)
 
 Working as =root= over SSH is fine to get started, but for day to
-day use it's worth switching to the =user= account defined in
-configuration.nix:
+day use it's worth enabling the =user= account defined in
+configuration.nix.
+
+The normal user configuration is commented out by default. To enable
+it, open =configuration.nix= and uncomment the user-related
+configuration. After uncommenting it, rebuild the system:
+
+#+begin_src sh
+sudo nixos-rebuild switch --flake .#phoneputer
+#+end_src
+
+Then reboot:
+
+#+begin_src sh
+sudo reboot
+#+end_src
+
+After the reboot, you can log in as the normal user:
 
 #+begin_src sh
 ssh user@172.16.42.1
-sudo nixos-rebuild switch --flake .#phoneputer
 #+end_src
 
 If you'd rather not type your password for every =sudo= command,
